@@ -335,3 +335,137 @@ td input:focus, td select:focus {
   border-radius: 6px;
 }
 .modal-table-wrap { overflow-y: auto; flex: 1; }
+/* =========================================================
+   DARK SLATE THEME (MENJAGA LAYOUT & PROPORSI ASLI)
+   ========================================================= */
+body {
+  background-color: #0b1120 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Header Atas */
+header, .app-header, .navbar {
+  background-color: #0f172a !important;
+  border-bottom: 1px solid #1e293b !important;
+}
+
+header h1, .app-header h1, .brand-title, h1, h2, h3 {
+  color: #f8fafc !important;
+}
+
+header p, .subtitle, .muted, small, label {
+  color: #94a3b8 !important;
+}
+
+/* Dua Panel Utama (Kiri & Kanan) */
+.card, .panel, .left-panel, .right-panel, section, .box {
+  background-color: #111827 !important;
+  border-color: #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+/* Kotak Drop Zone & Sub-kotak Parameter */
+#dropZone, .drop-zone {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+#dropZone:hover, #dropZone.dragover {
+  background-color: #162238 !important;
+  border-color: #38bdf8 !important;
+}
+
+.controls-box, .param-box, .summary-bar, .footer-note, details {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+  color: #cbd5e1 !important;
+}
+
+/* Input Teks, Angka & Metadata */
+input[type="text"],
+input[type="number"],
+input[type="search"],
+select {
+  background-color: #0f172a !important;
+  border: 1px solid #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus {
+  border-color: #38bdf8 !important;
+  outline: none !important;
+}
+
+/* Kotak Total Terbaca */
+#metaTotal {
+  background-color: #13233a !important;
+  border-color: #1d4ed8 !important;
+  color: #60a5fa !important;
+  font-weight: 700 !important;
+}
+
+/* Tombol Sekunder & Tab Non-Aktif */
+.tab-btn:not(.active),
+#btnAddRow,
+#btnMasterModal,
+#btnReprocess:disabled {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+.tab-btn:not(.active):hover,
+#btnAddRow:hover,
+#btnMasterModal:hover {
+  background-color: #273549 !important;
+  color: #ffffff !important;
+}
+
+/* Badge Prioritas Akun BPS di Header */
+.bps-filter, .filter-pill {
+  background-color: #13233a !important;
+  border-color: #1e40af !important;
+  color: #93c5fd !important;
+}
+
+/* Badge Status "Siap" */
+.badge-idle {
+  background-color: #1e293b !important;
+  color: #94a3b8 !important;
+  border: 1px solid #334155 !important;
+}
+
+/* Tabel Hasil Klasifikasi */
+.table-wrap, .table-container {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+table thead th {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+table tbody td {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+  border-bottom: 1px solid #1e293b !important;
+}
+
+table tbody tr:hover td {
+  background-color: #162033 !important;
+}
+
+.empty-row td {
+  color: #64748b !important;
+}
+
+/* Modal Master Kode Barang */
+#masterModal .modal-content {
+  background-color: #111827 !important;
+  border: 1px solid #334155 !important;
+  color: #f1f5f9 !important;
+}

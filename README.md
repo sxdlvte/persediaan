@@ -1,4 +1,4 @@
-#Detektor Persediaan Nota BMN (Computer Vision Klasik + Tesseract OCR)
+# Persediaan Nota BMN (Computer Vision Klasik + Tesseract OCR)
 
 Ekstensi Google Chrome (Manifest V3) ini mengekstrak teks dan tabel dari foto nota belanja **tanpa AI**, menggunakan alur **Computer Vision klasik** (Grayscale, Binarisasi Thresholding, Operasi Morfologi Erosi & Dilasi untuk Deteksi Grid Tabel, Pembesaran ROI 2x) dan **Tesseract OCR**, lalu mengklasifikasikan setiap item ke **404 Kode Barang** dari file `Daftar Kode Barang dan Catatan.xls` (Sheet: `BMN_Persediaan`).
 

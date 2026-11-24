@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detektor Persediaan Nota BMN (CV + OCR Non-AI)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo-box">BMN</div>
+      <div>
+        <h1>Detektor Persediaan Nota Belanja</h1>
+        <p class="subtitle">Computer Vision (Thresholding + Morfologi Grid) &bull; Tesseract OCR &bull; Klasifikasi BMN_Persediaan (404 Kode)</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <label class="toggle-chip" title="Sesuai catatan Excel baris 186: Satker BPS menggunakan kode akun 117111 dan 117113">
+        <input type="checkbox" id="filterBpsCheck" checked />
+        <span>Prioritas Akun BPS (117111 &amp; 117113)</span>
+      </label>
+      <button id="btnMasterModal" class="btn btn-secondary">Lihat Master Kode (404)</button>
+      <button id="btnExportCsv" class="btn btn-primary" disabled>Ekspor CSV / Excel</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- Panel Kiri: Input & Visualisasi Computer Vision -->
+    <section class="panel left-panel">
+      <div class="panel-header">
+        <h2>1. Input Gambar Nota &amp; Deteksi Grid</h2>
+        <span id="statusBadge" class="badge badge-idle">Siap</span>
+      </div>
+
+      <div id="dropZone" class="dropzone">
+        <input type="file" id="fileInput" accept="image/*" hidden />
+        <div class="drop-icon">&#128247;</div>
+        <p class="drop-title">Tarik &amp; lepaskan gambar nota ke sini, atau <span>pilih file</span></p>
+        <p class="drop-hint">Mendukung JPG, PNG, WEBP &bull; Juga bisa langsung tekan <strong>Ctrl + V</strong> (Paste Gambar)</p>
+      </div>
+
+      <div class="cv-controls">
+        <div class="control-group">
+          <label for="threshSlider">Ambang Binarisasi (Threshold): <strong id="threshVal">180</strong></label>
+          <input type="range" id="threshSlider" min="90" max="240" value="180" />
+        </div>
+        <div class="control-group">
+          <label for="kernelSlider">Panjang Kernel Garis Tabel: <strong id="kernelVal">40</strong> px</label>
+          <input type="range" id="kernelSlider" min="20" max="120" value="40" />
+        </div>
+        <button id="btnReprocess" class="btn btn-secondary btn-sm" disabled>Proses Ulang Gambar</button>
+      </div>
+
+      <div class="canvas-tabs">
+        <button class="tab-btn active" data-view="overlay">Deteksi Sel Tabel (CV)</button>
+        <button class="tab-btn" data-view="binary">Binarisasi (Hitam-Putih)</button>
+        <button class="tab-btn" data-view="original">Gambar Asli</button>
+      </div>
+
+      <div class="canvas-wrapper">
+        <canvas id="previewCanvas"></canvas>
+        <div id="emptyCanvasHint" class="empty-hint">Pratinjau deteksi garis tabel &amp; pemotongan sel (ROI) akan tampil di sini.</div>
+      </div>
+
+      <div class="progress-box" id="progressBox" style="display:none;">
+        <div class="progress-text">
+          <span id="progressLabel">Memproses citra...</span>
+          <span id="progressPct">0%</span>
+        </div>
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+      </div>
+
+      <details class="raw-ocr-box">
+        <summary>Log Ekstraksi Mentah Sel &amp; Teks Lengkap</summary>
+        <pre id="rawTextOutput">Belum ada hasil ekstraksi.</pre>
+      </details>
+    </section>
+
+    <!-- Panel Kanan: Hasil Ekstraksi & Klasifikasi Kode Barang -->
+    <section class="panel right-panel">
+      <div class="panel-header">
+        <h2>2. Hasil Klasifikasi Kode Barang (BMN_Persediaan)</h2>
+        <button id="btnAddRow" class="btn btn-secondary btn-sm">+ Tambah Baris Manual</button>
+      </div>
+
+      <div class="meta-grid" id="metaBox">
+        <div class="meta-item">
+          <span class="meta-label">Toko / Penyedia</span>
+          <input type="text" id="metaToko" placeholder="Terdeteksi otomatis / isi manual" />
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Tanggal Nota</span>
+          <input type="text" id="metaTanggal" placeholder="DD/MM/YYYY" />
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Nomor Nota</span>
+          <input type="text" id="metaNomor" placeholder="Nomor nota" />
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Total Terbaca</span>
+          <input type="text" id="metaTotal" readonly value="Rp 0" />
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table id="resultTable">
+          <thead>
+            <tr>
+              <th style="width: 38px;">No</th>
+              <th style="width: 24%;">Nama Barang (Hasil OCR)</th>
+              <th style="width: 90px;">Banyak</th>
+              <th style="width: 110px;">Harga Satuan</th>
+              <th style="width: 115px;">Total</th>
+              <th style="width: 28%;">Kode &amp; Uraian BMN_Persediaan</th>
+              <th style="width: 85px;">Akun</th>
+              <th style="width: 65px;">Skor</th>
+              <th style="width: 36px;"></th>
+            </tr>
+          </thead>
+          <tbody id="resultBody">
+            <tr class="empty-row">
+              <td colspan="9">Unggah gambar nota belanja di panel kiri untuk memulai deteksi otomatis.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="summary-footer">
+        <div class="summary-note">
+          <strong>Catatan Klasifikasi:</strong> Setiap item dapat dikoreksi melalui dropdown <em>Kode &amp; Uraian BMN_Persediaan</em> jika terdapat singkatan tidak baku pada nota.
+        </div>
+        <div class="summary-totals">
+          <div>Jumlah Item: <strong id="sumItems">0</strong></div>
+          <div>Total Akumulasi: <strong id="sumGrandTotal">Rp 0</strong></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Referensi Master Kode Barang -->
+  <div id="masterModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Referensi Master BMN_Persediaan (Sheet: BMN_Persediaan)</h3>
+        <button id="closeModal" class="btn-close">&times;</button>
+      </div>
+      <div class="modal-search">
+        <input type="text" id="searchMasterInput" placeholder="Cari kode barang (10103...), uraian barang, atau kode akun (117111 / 117113)..." />
+      </div>
+      <div class="modal-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Kode Barang (kd_brg)</th>
+              <th>Uraian Sub-Sub Kelompok (ur_sskel)</th>
+              <th>Kode Akun</th>
+              <th>Uraian Akun</th>
+            </tr>
+          </thead>
+          <tbody id="masterTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Datalist untuk Autocomplete Kode Barang di Tabel -->
+  <datalist id="bmnDatalist"></datalist>
+
+  <script src="master_bmn.js"></script>
+  <script src="lib/tesseract.min.js"></script>
+  <script src="cv_ocr_engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

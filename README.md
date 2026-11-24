@@ -1,4 +1,4 @@
-# Ekstensi Chrome: Detektor Persediaan Nota BMN (Computer Vision Klasik + Tesseract OCR)
+#Detektor Persediaan Nota BMN (Computer Vision Klasik + Tesseract OCR)
 
 Ekstensi Google Chrome (Manifest V3) ini mengekstrak teks dan tabel dari foto nota belanja **tanpa AI**, menggunakan alur **Computer Vision klasik** (Grayscale, Binarisasi Thresholding, Operasi Morfologi Erosi & Dilasi untuk Deteksi Grid Tabel, Pembesaran ROI 2x) dan **Tesseract OCR**, lalu mengklasifikasikan setiap item ke **404 Kode Barang** dari file `Daftar Kode Barang dan Catatan.xls` (Sheet: `BMN_Persediaan`).
 
@@ -59,5 +59,9 @@ Invoke-WebRequest -Uri "https://tessdata.projectnaptha.com/4.0.0/eng.traineddata
 ## Fitur Utama & Logika Pemetaan
 
 1. **Prioritas Akun BPS (`117111` & `117113`):** Sesuai catatan pada Excel baris 186 (*"SATKER BPS MENGGUNAKAN KODE AKUN 117111 DAN 117113"*), klasifikasi otomatis memprioritaskan 113 kode barang pada akun **117111 (Barang Konsumsi)** dan **117113 (Bahan untuk Pemeliharaan)**, namun tetap menyediakan seluruh **404 kode** pada kolom pencarian manual.
-2. **Pemetaan Kontekstual + Fuzzy Matching:** Menggabungkan aturan kamus persediaan kantor (misalnya merek *Vixal/Cling* $ightarrow$ `1010305008 Bahan Kimia Untuk Pembersih`, *Sapu/Sikat* $ightarrow$ `1010305001 Sapu Dan Sikat`, *Serok Sampah* $ightarrow$ `1010305004 Keset Dan Tempat Sampah`, *Lampu LED* $ightarrow$ `1010306002 Lampu Listrik`) dengan perhitungan kemiripan teks *Token Set Ratio + Levenshtein Distance*.
+2. **Pemetaan Kontekstual + Fuzzy Matching:** Menggabungkan aturan kamus persediaan kantor (misalnya merek *Vixal/Cling* $
+ightarrow$ `1010305008 Bahan Kimia Untuk Pembersih`, *Sapu/Sikat* $
+ightarrow$ `1010305001 Sapu Dan Sikat`, *Serok Sampah* $
+ightarrow$ `1010305004 Keset Dan Tempat Sampah`, *Lampu LED* $
+ightarrow$ `1010306002 Lampu Listrik`) dengan perhitungan kemiripan teks *Token Set Ratio + Levenshtein Distance*.
 3. **Ekspor Siap Excel / SAKTI:** Menghasilkan file `.csv` dengan pemisah titik koma (`;`) dan proteksi 10 digit kode barang agar tidak terpotong oleh format angka otomatis Microsoft Excel.

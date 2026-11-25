@@ -1,6 +1,6 @@
 /**
  * Pengendali Antarmuka Detektor Persediaan Nota BMN
- * Versi 2.5: Editor Master Kode BMN Interaktif + Scrollable Modal + Auto-Klasifikasi
+ * Versi 2.6: Modal Master Kode BMN Modern, Rapi, Center, & Scrollable
  */
 
 const cvEngine = new NotaCVEngine();
@@ -68,146 +68,284 @@ const progressFill = document.getElementById("progressFill");
 const rawTextOutput = document.getElementById("rawTextOutput");
 const resultBody = document.getElementById("resultBody");
 
-// Menyuntikkan CSS & Struktur Modal Master Kode agar rapi, proporsional, dan bisa di-scroll
+// Menyusun Ulang Tampilan Modal Master Kode agar rapi, proporsional, & scrollable
 function setupMasterModalEditorUI() {
-  if (!document.getElementById("masterModalCustomStyle")) {
+  const modalOverlay = document.getElementById("masterModal");
+  if (!modalOverlay) return;
+
+  if (!document.getElementById("masterModalModernStyle")) {
     const style = document.createElement("style");
-    style.id = "masterModalCustomStyle";
+    style.id = "masterModalModernStyle";
     style.textContent = `
       #masterModal {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: rgba(15, 23, 42, 0.55) !important;
+        backdrop-filter: blur(2px) !important;
+        z-index: 9999 !important;
         align-items: center !important;
         justify-content: center !important;
-        padding: 16px !important;
+        padding: 20px !important;
         box-sizing: border-box !important;
+        overflow: hidden !important;
       }
-      #masterModal .modal-content {
-        width: 95% !important;
-        max-width: 1050px !important;
-        height: 88vh !important;
-        max-height: 88vh !important;
+      #masterModal > div {
+        background: #ffffff !important;
+        width: 100% !important;
+        max-width: 1060px !important;
+        height: 86vh !important;
+        max-height: 86vh !important;
+        margin: 0 auto !important;
+        border-radius: 14px !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
-        padding: 18px 20px !important;
-        border-radius: 12px !important;
+        padding: 20px 24px !important;
         box-sizing: border-box !important;
       }
-      #masterModal .modal-header {
-        flex-shrink: 0 !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        padding-bottom: 10px !important;
-        border-bottom: 1px solid #e2e8f0 !important;
-        margin-bottom: 10px !important;
+      .bmn-modal-header {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 14px;
+        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 14px;
       }
-      #masterEditorToolbar {
-        flex-shrink: 0 !important;
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 8px !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        margin-bottom: 10px !important;
-        padding: 10px 12px !important;
-        background: #f8fafc !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 8px !important;
+      .bmn-modal-header h3 {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 700;
+        color: #0f172a;
       }
-      #masterModal .modal-search {
-        flex-shrink: 0 !important;
-        margin-bottom: 10px !important;
+      .bmn-close-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        color: #475569;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
       }
-      #masterModal .modal-search input {
-        width: 100% !important;
-        padding: 8px 12px !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 6px !important;
-        font-size: 13px !important;
-        box-sizing: border-box !important;
+      .bmn-close-btn:hover {
+        background: #fee2e2;
+        color: #dc2626;
+        border-color: #fecaca;
       }
-      #masterModal .modal-body {
-        flex: 1 1 auto !important;
-        overflow-y: auto !important;
-        overflow-x: auto !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 8px !important;
-        background: #ffffff !important;
-        min-height: 0 !important;
+      .bmn-editor-bar {
+        flex-shrink: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-bottom: 12px;
       }
-      #masterModal .modal-body table {
-        width: 100% !important;
-        border-collapse: collapse !important;
-        font-size: 13px !important;
+      .bmn-editor-inputs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
       }
-      #masterModal .modal-body thead th {
-        position: sticky !important;
-        top: 0 !important;
-        z-index: 10 !important;
-        background: #f1f5f9 !important;
-        color: #1e293b !important;
-        font-weight: 600 !important;
-        text-align: left !important;
-        padding: 10px 12px !important;
-        border-bottom: 2px solid #cbd5e1 !important;
+      .bmn-editor-inputs input,
+      .bmn-editor-inputs select {
+        height: 34px;
+        padding: 0 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        font-size: 13px;
+        background: #ffffff;
+        color: #1e293b;
+        box-sizing: border-box;
       }
-      #masterModal .modal-body tbody td {
-        padding: 8px 12px !important;
-        border-bottom: 1px solid #f1f5f9 !important;
-        vertical-align: middle !important;
+      .bmn-editor-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
       }
-      #masterModal .modal-body tbody tr:hover {
-        background-color: #f8fafc !important;
+      .bmn-btn {
+        height: 34px;
+        padding: 0 14px;
+        border-radius: 7px;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid transparent;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+      }
+      .bmn-btn-primary {
+        background: #2563eb;
+        color: #ffffff;
+      }
+      .bmn-btn-primary:hover {
+        background: #1d4ed8;
+      }
+      .bmn-btn-outline {
+        background: #ffffff;
+        color: #334155;
+        border-color: #cbd5e1;
+      }
+      .bmn-btn-outline:hover {
+        background: #f1f5f9;
+      }
+      .bmn-btn-danger-outline {
+        background: #ffffff;
+        color: #dc2626;
+        border-color: #fecaca;
+      }
+      .bmn-btn-danger-outline:hover {
+        background: #fef2f2;
+      }
+      .bmn-search-wrap {
+        flex-shrink: 0;
+        margin-bottom: 12px;
+      }
+      .bmn-search-wrap input {
+        width: 100%;
+        height: 38px;
+        padding: 0 14px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 13.5px;
+        box-sizing: border-box;
+        outline: none;
+      }
+      .bmn-search-wrap input:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+      }
+      .bmn-table-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #ffffff;
+      }
+      .bmn-table-scroll::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      .bmn-table-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .bmn-table-scroll::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      .bmn-table-scroll table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .bmn-table-scroll thead th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: #f1f5f9;
+        color: #1e293b;
+        font-weight: 700;
+        text-align: left;
+        padding: 11px 14px;
+        border-bottom: 2px solid #cbd5e1;
+      }
+      .bmn-table-scroll tbody td {
+        padding: 9px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+        vertical-align: middle;
+      }
+      .bmn-table-scroll tbody tr:hover {
+        background: #f8fafc;
       }
     `;
     document.head.appendChild(style);
   }
 
-  const modalContent = document.querySelector("#masterModal .modal-content");
-  const modalSearch = document.querySelector("#masterModal .modal-search");
-  if (!modalContent || !modalSearch || document.getElementById("masterEditorToolbar")) return;
+  const dialogBox = modalOverlay.firstElementChild;
+  if (!dialogBox || dialogBox.dataset.upgraded === "true") return;
+  dialogBox.dataset.upgraded = "true";
 
-  const toolbar = document.createElement("div");
-  toolbar.id = "masterEditorToolbar";
-
-  toolbar.innerHTML = `
-    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
-      <input type="text" id="newKdBrg" placeholder="Kode 10 digit (10103...)" style="width:165px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" />
-      <input type="text" id="newUrSskel" placeholder="Uraian Barang Baru..." style="width:230px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" />
-      <select id="newKdAkun" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; background:#fff;">
-        <option value="117111">117111 - Barang Konsumsi</option>
-        <option value="117113">117113 - Bahan Pemeliharaan</option>
-        <option value="117114">117114 - Suku Cadang</option>
-        <option value="117199">117199 - Persediaan Lainnya</option>
-      </select>
-      <button type="button" id="btnAddMasterItem" class="btn btn-primary btn-sm">+ Tambah Kode</button>
+  // Bangun ulang struktur dalam kotak dialog agar 100% teratur dan bisa di-scroll
+  dialogBox.innerHTML = `
+    <div class="bmn-modal-header">
+      <h3>Referensi & Editor Master BMN_Persediaan</h3>
+      <button type="button" id="closeModal" class="bmn-close-btn" title="Tutup">&times;</button>
     </div>
-    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
-      <button type="button" id="btnCopyMasterJs" class="btn btn-secondary btn-sm" title="Salin array JS untuk ditempel ke file master_bmn.js">Salin Kode JS</button>
-      <button type="button" id="btnResetMaster" class="btn btn-secondary btn-sm" style="color:#dc2626; border-color:#fecaca;">Reset Default</button>
+
+    <div class="bmn-editor-bar">
+      <div class="bmn-editor-inputs">
+        <input type="text" id="newKdBrg" placeholder="Kode 10 digit (10103...)" style="width:170px;" />
+        <input type="text" id="newUrSskel" placeholder="Uraian Barang Baru..." style="width:240px;" />
+        <select id="newKdAkun" style="width:185px;">
+          <option value="117111">117111 - Barang Konsumsi</option>
+          <option value="117113">117113 - Bahan Pemeliharaan</option>
+          <option value="117114">117114 - Suku Cadang</option>
+          <option value="117199">117199 - Persediaan Lainnya</option>
+        </select>
+        <button type="button" id="btnAddMasterItem" class="bmn-btn bmn-btn-primary">+ Tambah Kode</button>
+      </div>
+      <div class="bmn-editor-actions">
+        <button type="button" id="btnCopyMasterJs" class="bmn-btn bmn-btn-outline" title="Salin array JS untuk file master_bmn.js">Salin Kode JS</button>
+        <button type="button" id="btnResetMaster" class="bmn-btn bmn-btn-danger-outline">Reset Default</button>
+      </div>
+    </div>
+
+    <div class="bmn-search-wrap">
+      <input type="text" id="searchMasterInput" placeholder="Cari kode barang (10103...), uraian barang, atau kode akun (117111 / 117113)..." />
+    </div>
+
+    <div class="bmn-table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:135px;">Kode Barang</th>
+            <th>Uraian Sub-Sub Kelompok (ur_sskel)</th>
+            <th style="width:95px;">Kode Akun</th>
+            <th style="width:195px;">Uraian Akun</th>
+            <th style="width:120px; text-align:center;">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="masterTableBody"></tbody>
+      </table>
     </div>
   `;
 
-  modalContent.insertBefore(toolbar, modalSearch);
+  // Pasang kembali event tombol tutup, klik luar modal, pencarian, tambah, salin, dan reset
+  document.getElementById("closeModal").addEventListener("click", () => {
+    modalOverlay.style.display = "none";
+  });
 
-  // Pastikan tabel berada di dalam wadah .modal-body yang bisa di-scroll
-  const tableEl = modalContent.querySelector("table");
-  if (tableEl && !tableEl.parentElement.classList.contains("modal-body")) {
-    const scrollWrapper = document.createElement("div");
-    scrollWrapper.className = "modal-body";
-    tableEl.parentNode.insertBefore(scrollWrapper, tableEl);
-    scrollWrapper.appendChild(tableEl);
-  }
+  modalOverlay.addEventListener("click", (e) => {
+    if (e.target === modalOverlay) {
+      modalOverlay.style.display = "none";
+    }
+  });
 
-  // Tambah kolom Aksi pada header tabel modal jika belum ada
-  const modalTheadRow = document.querySelector("#masterModal thead tr");
-  if (modalTheadRow && modalTheadRow.children.length === 4) {
-    const thAksi = document.createElement("th");
-    thAksi.textContent = "Aksi";
-    thAksi.style.width = "120px";
-    thAksi.style.textAlign = "center";
-    modalTheadRow.appendChild(thAksi);
-  }
+  document.getElementById("searchMasterInput").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase();
+    const rows = document.querySelectorAll("#masterTableBody tr");
+    rows.forEach((tr) => {
+      tr.style.display = tr.textContent.toLowerCase().includes(q) ? "" : "none";
+    });
+  });
 
   document.getElementById("btnAddMasterItem").addEventListener("click", () => {
     const kd = document.getElementById("newKdBrg").value.trim();
@@ -250,7 +388,7 @@ function setupMasterModalEditorUI() {
   });
 
   document.getElementById("btnResetMaster").addEventListener("click", () => {
-    if (!confirm("Kembalikan seluruh data Master Kode ke bawaan awal file master_bmn.js?")) return;
+    if (!confirm("Kembalikan seluruh data Master Kode ke pengaturan awal file master_bmn.js?")) return;
     localStorage.removeItem(MASTER_STORAGE_KEY);
     activeMasterList = JSON.parse(JSON.stringify(DEFAULT_MASTER_BACKUP));
     initMasterReference();
@@ -286,13 +424,13 @@ function initMasterReference() {
     }
 
     tr.innerHTML = `
-      <td style="width:130px; font-family:monospace;"><strong class="m-kd">${escapeHtml(item.kd_brg)}</strong></td>
+      <td style="font-family:monospace; font-weight:700; color:#0f172a;">${escapeHtml(item.kd_brg)}</td>
       <td class="m-ur-cell">${escapeHtml(item.ur_sskel)}</td>
-      <td class="m-akun-cell" style="width:90px; font-weight:600;">${escapeHtml(item.kd_akun)}</td>
-      <td class="m-urakun-cell" style="width:190px;">${escapeHtml(item.ur_akun)}</td>
-      <td style="width:120px; text-align:center; white-space:nowrap;">
-        <button type="button" class="btn btn-secondary btn-sm btn-edit-m" style="padding:4px 10px; font-size:11px;">Edit</button>
-        <button type="button" class="btn-del btn-del-m" style="padding:4px 8px; font-size:11px; margin-left:4px;" title="Hapus kode">&times;</button>
+      <td class="m-akun-cell" style="font-weight:600;">${escapeHtml(item.kd_akun)}</td>
+      <td class="m-urakun-cell">${escapeHtml(item.ur_akun)}</td>
+      <td style="text-align:center; white-space:nowrap;">
+        <button type="button" class="bmn-btn bmn-btn-outline btn-edit-m" style="height:28px; padding:0 10px; font-size:12px;">Edit</button>
+        <button type="button" class="bmn-btn bmn-btn-danger-outline btn-del-m" style="height:28px; width:28px; padding:0; font-size:14px; margin-left:4px;" title="Hapus kode">&times;</button>
       </td>
     `;
 
@@ -306,18 +444,17 @@ function initMasterReference() {
         btnEdit.style.color = "#ffffff";
         btnEdit.style.borderColor = "#16a34a";
 
-        tr.querySelector(".m-ur-cell").innerHTML = `<input type="text" class="edit-ur-inp" value="${escapeHtml(item.ur_sskel)}" style="width:100%; padding:5px 8px; border:1px solid #3b82f6; border-radius:5px; font-size:12px; box-sizing:border-box;" />`;
+        tr.querySelector(".m-ur-cell").innerHTML = `<input type="text" class="edit-ur-inp" value="${escapeHtml(item.ur_sskel)}" style="width:100%; height:30px; padding:0 8px; border:1px solid #2563eb; border-radius:6px; font-size:12.5px; box-sizing:border-box;" />`;
         tr.querySelector(".m-akun-cell").innerHTML = `
-          <select class="edit-akun-inp" style="padding:5px 6px; border:1px solid #3b82f6; border-radius:5px; font-size:12px; background:#fff;">
+          <select class="edit-akun-inp" style="height:30px; padding:0 6px; border:1px solid #2563eb; border-radius:6px; font-size:12.5px; background:#fff;">
             <option value="117111" ${item.kd_akun === "117111" ? "selected" : ""}>117111</option>
             <option value="117113" ${item.kd_akun === "117113" ? "selected" : ""}>117113</option>
             <option value="117114" ${item.kd_akun === "117114" ? "selected" : ""}>117114</option>
             <option value="117199" ${item.kd_akun === "117199" ? "selected" : ""}>117199</option>
           </select>
         `;
-        tr.querySelector(".m-urakun-cell").innerHTML = `<input type="text" class="edit-urakun-inp" value="${escapeHtml(item.ur_akun)}" style="width:100%; padding:5px 8px; border:1px solid #3b82f6; border-radius:5px; font-size:12px; box-sizing:border-box;" />`;
+        tr.querySelector(".m-urakun-cell").innerHTML = `<input type="text" class="edit-urakun-inp" value="${escapeHtml(item.ur_akun)}" style="width:100%; height:30px; padding:0 8px; border:1px solid #2563eb; border-radius:6px; font-size:12.5px; box-sizing:border-box;" />`;
 
-        // Otomatis sinkronkan uraian akun saat dropdown akun diubah
         const selAkun = tr.querySelector(".edit-akun-inp");
         const inpUrAkun = tr.querySelector(".edit-urakun-inp");
         selAkun.addEventListener("change", () => {
@@ -1009,16 +1146,6 @@ btnExportCsv.addEventListener("click", () => {
 const masterModal = document.getElementById("masterModal");
 document.getElementById("btnMasterModal").addEventListener("click", () => {
   masterModal.style.display = "flex";
-});
-document.getElementById("closeModal").addEventListener("click", () => {
-  masterModal.style.display = "none";
-});
-document.getElementById("searchMasterInput").addEventListener("input", (e) => {
-  const q = e.target.value.toLowerCase();
-  const rows = document.querySelectorAll("#masterTableBody tr");
-  rows.forEach((tr) => {
-    tr.style.display = tr.textContent.toLowerCase().includes(q) ? "" : "none";
-  });
 });
 
 function escapeHtml(str) {

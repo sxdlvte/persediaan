@@ -1,6 +1,6 @@
 /**
- * Pengendali Antarmuka Ekstensi Detektor Persediaan Nota BMN
- * Versi Stabil: Mendukung Nota Tabel (ZONA BANUA Mart dll) & Struk Multi-Baris
+ * Pengendali Antarmuka Detektor Persediaan Nota BMN
+ * Versi 2.4: Mendukung Nota Tabel, Struk Multi-Baris, & Editor Master Kode BMN
  */
 
 const cvEngine = new NotaCVEngine();
@@ -10,6 +10,42 @@ let binaryCanvas = document.createElement("canvas");
 let overlayCanvas = document.createElement("canvas");
 let activeView = "overlay";
 let extractedRows = [];
+
+// Penyimpanan Master BMN Aktif (mengambil dari localStorage jika pernah diedit user)
+const MASTER_STORAGE_KEY = "bmn_master_persediaan_custom_v1";
+const DEFAULT_MASTER_BACKUP = JSON.parse(JSON.stringify(MASTER_BMN_PERSEDIAAN));
+let activeMasterList = loadActiveMasterList();
+
+function loadActiveMasterList() {
+  try {
+    const saved = localStorage.getItem(MASTER_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn("Gagal memuat custom master dari localStorage:", e);
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_MASTER_BACKUP));
+}
+
+function saveActiveMasterList() {
+  try {
+    localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(activeMasterList));
+  } catch (e) {
+    console.warn("Gagal menyimpan custom master ke localStorage:", e);
+  }
+  initMasterReference();
+  reclassifyAllExtractedRows();
+}
+
+function getDefaultUraianAkun(kdAkun) {
+  if (kdAkun === "117111") return "Barang Konsumsi";
+  if (kdAkun === "117113") return "Bahan untuk Pemeliharaan";
+  if (kdAkun === "117114") return "Suku Cadang";
+  if (kdAkun === "117199") return "Persediaan Lainnya";
+  return "Persediaan";
+}
 
 // Referensi Elemen DOM
 const dropZone = document.getElementById("dropZone");
@@ -32,26 +68,175 @@ const progressFill = document.getElementById("progressFill");
 const rawTextOutput = document.getElementById("rawTextOutput");
 const resultBody = document.getElementById("resultBody");
 
+// Bangun Toolbar Editor di dalam Modal Master Kode secara dinamis
+function setupMasterModalEditorUI() {
+  const modalContent = document.querySelector("#masterModal .modal-content");
+  const modalSearch = document.querySelector("#masterModal .modal-search");
+  if (!modalContent || !modalSearch || document.getElementById("masterEditorToolbar")) return;
+
+  const toolbar = document.createElement("div");
+  toolbar.id = "masterEditorToolbar";
+  toolbar.style.cssText =
+    "display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-bottom:10px; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;";
+
+  toolbar.innerHTML = `
+    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+      <input type="text" id="newKdBrg" placeholder="Kode 10 digit (10103...)" style="width:155px; padding:5px 8px; font-size:12px;" />
+      <input type="text" id="newUrSskel" placeholder="Uraian Barang Baru..." style="width:220px; padding:5px 8px; font-size:12px;" />
+      <input type="text" id="newKdAkun" value="117111" placeholder="Akun (117111)" style="width:85px; padding:5px 8px; font-size:12px;" />
+      <button type="button" id="btnAddMasterItem" class="btn btn-primary btn-sm">+ Tambah Kode</button>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+      <button type="button" id="btnCopyMasterJs" class="btn btn-secondary btn-sm" title="Salin kode array JS untuk ditempel ke file master_bmn.js">Salin Kode JS</button>
+      <button type="button" id="btnResetMaster" class="btn btn-secondary btn-sm" style="color:#dc2626; border-color:#fecaca;">Reset Default</button>
+    </div>
+  `;
+
+  modalContent.insertBefore(toolbar, modalSearch);
+
+  // Tambah kolom Aksi pada header tabel modal jika belum ada
+  const modalTheadRow = document.querySelector("#masterModal thead tr");
+  if (modalTheadRow && modalTheadRow.children.length === 4) {
+    const thAksi = document.createElement("th");
+    thAksi.textContent = "Aksi";
+    thAksi.style.width = "125px";
+    modalTheadRow.appendChild(thAksi);
+  }
+
+  document.getElementById("btnAddMasterItem").addEventListener("click", () => {
+    const kd = document.getElementById("newKdBrg").value.trim();
+    const ur = document.getElementById("newUrSskel").value.trim();
+    const akun = document.getElementById("newKdAkun").value.trim() || "117111";
+
+    if (!kd || !ur) {
+      alert("Isi Kode Barang (10 digit) dan Uraian Barang terlebih dahulu.");
+      return;
+    }
+    if (activeMasterList.some((m) => m.kd_brg === kd)) {
+      alert(`Kode barang ${kd} sudah ada di daftar master. Silakan edit baris yang sudah ada.`);
+      return;
+    }
+
+    activeMasterList.unshift({
+      kd_brg: kd,
+      ur_sskel: ur,
+      kd_akun: akun,
+      ur_akun: getDefaultUraianAkun(akun)
+    });
+
+    document.getElementById("newKdBrg").value = "";
+    document.getElementById("newUrSskel").value = "";
+    saveActiveMasterList();
+    alert(`Kode ${kd} berhasil ditambahkan!`);
+  });
+
+  document.getElementById("btnCopyMasterJs").addEventListener("click", async () => {
+    const jsOutput =
+      "const MASTER_BMN_PERSEDIAAN = " + JSON.stringify(activeMasterList, null, 2) + ";";
+    try {
+      await navigator.clipboard.writeText(jsOutput);
+      alert(
+        "Kode MASTER_BMN_PERSEDIAAN terbaru berhasil disalin ke clipboard!\n\nSilakan buka file master_bmn.js di VS Code dan timpa array lama agar perubahan permanen di GitHub Pages."
+      );
+    } catch (err) {
+      prompt("Salin manual kode berikut (Ctrl + C):", jsOutput);
+    }
+  });
+
+  document.getElementById("btnResetMaster").addEventListener("click", () => {
+    if (!confirm("Kembalikan seluruh data Master Kode ke pengaturan awal file master_bmn.js?")) return;
+    localStorage.removeItem(MASTER_STORAGE_KEY);
+    activeMasterList = JSON.parse(JSON.stringify(DEFAULT_MASTER_BACKUP));
+    initMasterReference();
+    reclassifyAllExtractedRows();
+    alert("Master Kode berhasil dikembalikan ke bawaan awal.");
+  });
+}
+
 function initMasterReference() {
+  setupMasterModalEditorUI();
+
   const datalist = document.getElementById("bmnDatalist");
   const masterBody = document.getElementById("masterTableBody");
+  const btnMasterModal = document.getElementById("btnMasterModal");
+  const searchQuery = (document.getElementById("searchMasterInput")?.value || "").toLowerCase();
+
+  if (btnMasterModal) {
+    btnMasterModal.textContent = `Lihat / Edit Master (${activeMasterList.length})`;
+  }
+
   datalist.innerHTML = "";
   masterBody.innerHTML = "";
 
-  MASTER_BMN_PERSEDIAAN.forEach((item) => {
+  activeMasterList.forEach((item, idx) => {
     const opt = document.createElement("option");
     opt.value = `${item.kd_brg} - ${item.ur_sskel}`;
     datalist.appendChild(opt);
 
     const tr = document.createElement("tr");
+    const rowText = `${item.kd_brg} ${item.ur_sskel} ${item.kd_akun} ${item.ur_akun}`.toLowerCase();
+    if (searchQuery && !rowText.includes(searchQuery)) {
+      tr.style.display = "none";
+    }
+
     tr.innerHTML = `
-      <td><strong>${item.kd_brg}</strong></td>
-      <td>${item.ur_sskel}</td>
-      <td>${item.kd_akun}</td>
-      <td>${item.ur_akun}</td>
+      <td><strong class="m-kd">${escapeHtml(item.kd_brg)}</strong></td>
+      <td class="m-ur-cell">${escapeHtml(item.ur_sskel)}</td>
+      <td class="m-akun-cell">${escapeHtml(item.kd_akun)}</td>
+      <td class="m-urakun-cell">${escapeHtml(item.ur_akun)}</td>
+      <td style="white-space:nowrap;">
+        <button type="button" class="btn btn-secondary btn-sm btn-edit-m" style="padding:3px 8px; font-size:11px;">Edit</button>
+        <button type="button" class="btn-del btn-del-m" style="padding:3px 7px; font-size:11px;" title="Hapus kode">&times;</button>
+      </td>
     `;
+
+    const btnEdit = tr.querySelector(".btn-edit-m");
+    btnEdit.addEventListener("click", () => {
+      const isEditing = btnEdit.dataset.editing === "true";
+      if (!isEditing) {
+        btnEdit.dataset.editing = "true";
+        btnEdit.textContent = "Simpan";
+        btnEdit.style.backgroundColor = "#16a34a";
+        btnEdit.style.color = "#ffffff";
+        btnEdit.style.borderColor = "#16a34a";
+
+        tr.querySelector(".m-ur-cell").innerHTML = `<input type="text" class="edit-ur-inp" value="${escapeHtml(item.ur_sskel)}" style="width:100%; padding:4px 6px; font-size:12px;" />`;
+        tr.querySelector(".m-akun-cell").innerHTML = `<input type="text" class="edit-akun-inp" value="${escapeHtml(item.kd_akun)}" style="width:75px; padding:4px 6px; font-size:12px;" />`;
+        tr.querySelector(".m-urakun-cell").innerHTML = `<input type="text" class="edit-urakun-inp" value="${escapeHtml(item.ur_akun)}" style="width:100%; padding:4px 6px; font-size:12px;" />`;
+      } else {
+        const newUr = tr.querySelector(".edit-ur-inp").value.trim();
+        const newAkun = tr.querySelector(".edit-akun-inp").value.trim() || "117111";
+        const newUrAkun = tr.querySelector(".edit-urakun-inp").value.trim() || getDefaultUraianAkun(newAkun);
+
+        if (newUr) {
+          activeMasterList[idx].ur_sskel = newUr;
+          activeMasterList[idx].kd_akun = newAkun;
+          activeMasterList[idx].ur_akun = newUrAkun;
+          saveActiveMasterList();
+        }
+      }
+    });
+
+    tr.querySelector(".btn-del-m").addEventListener("click", () => {
+      if (!confirm(`Hapus kode barang ${item.kd_brg} (${item.ur_sskel}) dari daftar master?`)) return;
+      activeMasterList.splice(idx, 1);
+      saveActiveMasterList();
+    });
+
     masterBody.appendChild(tr);
   });
+}
+
+function reclassifyAllExtractedRows() {
+  if (extractedRows.length === 0) return;
+  extractedRows.forEach((row) => {
+    const cls = cvEngine.classifyItem(row.nama, activeMasterList, filterBpsCheck.checked);
+    row.kd_brg = cls.kd_brg;
+    row.ur_sskel = cls.ur_sskel;
+    row.kd_akun = cls.kd_akun;
+    row.score = cls.score;
+  });
+  renderResultTable();
 }
 
 initMasterReference();
@@ -92,14 +277,7 @@ btnReprocess.addEventListener("click", () => {
 });
 
 filterBpsCheck.addEventListener("change", () => {
-  extractedRows.forEach((row) => {
-    const cls = cvEngine.classifyItem(row.nama, MASTER_BMN_PERSEDIAAN, filterBpsCheck.checked);
-    row.kd_brg = cls.kd_brg;
-    row.ur_sskel = cls.ur_sskel;
-    row.kd_akun = cls.kd_akun;
-    row.score = cls.score;
-  });
-  renderResultTable();
+  reclassifyAllExtractedRows();
 });
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -254,7 +432,6 @@ async function processNotaImage(img) {
       });
     });
   } else if (tableRowBounds && tableRowBounds.length >= 3) {
-    // Visualisasi garis baris horizontal jika garis vertikal terputus kompresi JPEG
     tableRowBounds.forEach((rb, rIdx) => {
       ovCtx.strokeStyle = rIdx === 0 ? "#ef4444" : "#16a34a";
       ovCtx.strokeRect(10, rb.y1, w - 20, rb.h);
@@ -292,7 +469,6 @@ async function processNotaImage(img) {
     extractedRows = [];
 
     if (cells.length >= 2) {
-      // Mode A1: Grid Sel Penuh (Garis Horizontal + Vertikal Terdeteksi)
       rawLog.push(`\n=== DETEKSI TABEL PENUH: ${cells.length} BARIS x ${cells[0].length} KOLOM ===`);
       const totalRows = cells.length;
 
@@ -326,7 +502,7 @@ async function processNotaImage(img) {
         const harga = parseCurrency(cellTexts[3] || "0");
         const total = parseCurrency(cellTexts[4] || "0") || harga;
 
-        const cls = cvEngine.classifyItem(namaBersih, MASTER_BMN_PERSEDIAAN, filterBpsCheck.checked);
+        const cls = cvEngine.classifyItem(namaBersih, activeMasterList, filterBpsCheck.checked);
         rawLog.push(`   -> Nama Bersih: "${namaBersih}" => Kode BMN: ${cls.kd_brg} (${cls.ur_sskel}) [${cls.score}%]`);
 
         extractedRows.push({
@@ -342,7 +518,6 @@ async function processNotaImage(img) {
         });
       }
     } else if (tableRowBounds && tableRowBounds.length >= 3) {
-      // Mode A2: Garis Baris Horizontal Terdeteksi (Potong per baris horizontal!)
       rawLog.push(`\n=== DETEKSI BARIS HORIZONTAL TABEL: ${tableRowBounds.length} BARIS ===`);
       const totalRows = tableRowBounds.length;
 
@@ -375,7 +550,7 @@ async function processNotaImage(img) {
           harga = Math.round(total / qtyNum);
         }
 
-        const cls = cvEngine.classifyItem(namaBersih, MASTER_BMN_PERSEDIAAN, filterBpsCheck.checked);
+        const cls = cvEngine.classifyItem(namaBersih, activeMasterList, filterBpsCheck.checked);
         rawLog.push(`   -> Nama Bersih: "${namaBersih}" | Qty: ${banyak} => Kode BMN: ${cls.kd_brg} (${cls.ur_sskel}) [${cls.score}%]`);
 
         extractedRows.push({
@@ -391,7 +566,6 @@ async function processNotaImage(img) {
         });
       }
     } else {
-      // Mode B: Nota Polos / Struk Kasir Multi-Baris tanpa garis tabel
       setProgress(65, "Nota tanpa garis tabel — menganalisis item multi-baris...");
       const fullRes = await worker.recognize(originalCanvas.toDataURL("image/png"));
       rawLog.push("\n=== MODE STRUK / NON-TABEL ===\n" + fullRes.data.text);
@@ -439,7 +613,6 @@ function parseSpatialMultiLineItems(tessData, canvasWidth, canvasHeight, rawLog 
     const txt = (w.text || "").trim();
     if (!txt) continue;
     const centerY = (w.bbox.y0 + w.bbox.y1) / 2;
-    // Abaikan area header atas (< 18%) dan footer bawah (> 82%)
     if (centerY < canvasHeight * 0.18 || centerY > canvasHeight * 0.82) continue;
 
     const height = Math.max(10, w.bbox.y1 - w.bbox.y0);
@@ -537,7 +710,7 @@ function parseSpatialMultiLineItems(tessData, canvasWidth, canvasHeight, rawLog 
     const total = anc.price;
     const harga = qtyNum > 1 ? Math.round(total / qtyNum) : total;
 
-    const cls = cvEngine.classifyItem(namaBersih, MASTER_BMN_PERSEDIAAN, filterBpsCheck.checked);
+    const cls = cvEngine.classifyItem(namaBersih, activeMasterList, filterBpsCheck.checked);
     rawLog.push(
       `Item #${idx}: "${combinedRaw}" + [${anc.raw}]\n` +
       `   -> Nama Bersih: "${namaBersih}" | Qty: ${banyak} | Satuan: ${harga} | Total: ${total}\n` +
@@ -592,7 +765,7 @@ function renderResultTable() {
 
     tr.querySelector(".inp-nama").addEventListener("change", (e) => {
       row.nama = sanitizeExtractedItemName(e.target.value) || e.target.value.trim();
-      const cls = cvEngine.classifyItem(row.nama, MASTER_BMN_PERSEDIAAN, filterBpsCheck.checked);
+      const cls = cvEngine.classifyItem(row.nama, activeMasterList, filterBpsCheck.checked);
       row.kd_brg = cls.kd_brg;
       row.ur_sskel = cls.ur_sskel;
       row.kd_akun = cls.kd_akun;
@@ -620,7 +793,7 @@ function renderResultTable() {
     tr.querySelector(".inp-kode").addEventListener("change", (e) => {
       const val = e.target.value.trim();
       const kd = val.split("-")[0].trim();
-      const matched = MASTER_BMN_PERSEDIAAN.find((m) => m.kd_brg === kd);
+      const matched = activeMasterList.find((m) => m.kd_brg === kd);
       if (matched) {
         row.kd_brg = matched.kd_brg;
         row.ur_sskel = matched.ur_sskel;

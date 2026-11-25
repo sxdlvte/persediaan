@@ -1,6 +1,6 @@
 /**
  * Pengendali Antarmuka Detektor Persediaan Nota BMN
- * Versi 2.6: Modal Master Kode BMN Modern, Rapi, Center, & Scrollable
+ * Versi 2.7: Modal Master BMN dengan Paging + Scroll + Edit Lengkap Master Barang
  */
 
 const cvEngine = new NotaCVEngine();
@@ -15,6 +15,10 @@ let extractedRows = [];
 const MASTER_STORAGE_KEY = "bmn_master_persediaan_custom_v1";
 const DEFAULT_MASTER_BACKUP = JSON.parse(JSON.stringify(MASTER_BMN_PERSEDIAAN));
 let activeMasterList = loadActiveMasterList();
+
+// State Paging Modal Master
+let masterCurrentPage = 1;
+let masterPageSize = 25;
 
 function loadActiveMasterList() {
   try {
@@ -43,6 +47,7 @@ function getDefaultUraianAkun(kdAkun) {
   if (kdAkun === "117111") return "Barang Konsumsi";
   if (kdAkun === "117113") return "Bahan untuk Pemeliharaan";
   if (kdAkun === "117114") return "Suku Cadang";
+  if (kdAkun === "117131") return "Bahan Baku";
   if (kdAkun === "117199") return "Persediaan Lainnya";
   return "Persediaan";
 }
@@ -68,7 +73,7 @@ const progressFill = document.getElementById("progressFill");
 const rawTextOutput = document.getElementById("rawTextOutput");
 const resultBody = document.getElementById("resultBody");
 
-// Menyusun Ulang Tampilan Modal Master Kode agar rapi, proporsional, & scrollable
+// Menyusun Ulang Tampilan Modal Master Kode agar rapi, scrollable, & memiliki paging
 function setupMasterModalEditorUI() {
   const modalOverlay = document.getElementById("masterModal");
   if (!modalOverlay) return;
@@ -87,23 +92,23 @@ function setupMasterModalEditorUI() {
         z-index: 9999 !important;
         align-items: center !important;
         justify-content: center !important;
-        padding: 20px !important;
+        padding: 16px !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
       }
       #masterModal > div {
         background: #ffffff !important;
         width: 100% !important;
-        max-width: 1060px !important;
-        height: 86vh !important;
-        max-height: 86vh !important;
+        max-width: 1080px !important;
+        height: 90vh !important;
+        max-height: 90vh !important;
         margin: 0 auto !important;
         border-radius: 14px !important;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
-        padding: 20px 24px !important;
+        padding: 18px 22px !important;
         box-sizing: border-box !important;
       }
       .bmn-modal-header {
@@ -111,13 +116,13 @@ function setupMasterModalEditorUI() {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding-bottom: 14px;
+        padding-bottom: 12px;
         border-bottom: 1px solid #e2e8f0;
-        margin-bottom: 14px;
+        margin-bottom: 12px;
       }
       .bmn-modal-header h3 {
         margin: 0;
-        font-size: 17px;
+        font-size: 16.5px;
         font-weight: 700;
         color: #0f172a;
       }
@@ -134,7 +139,6 @@ function setupMasterModalEditorUI() {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.15s;
       }
       .bmn-close-btn:hover {
         background: #fee2e2;
@@ -145,14 +149,14 @@ function setupMasterModalEditorUI() {
         flex-shrink: 0;
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 8px;
         align-items: center;
         justify-content: space-between;
         background: #f8fafc;
         border: 1px solid #e2e8f0;
         border-radius: 10px;
-        padding: 10px 14px;
-        margin-bottom: 12px;
+        padding: 9px 12px;
+        margin-bottom: 10px;
       }
       .bmn-editor-inputs {
         display: flex;
@@ -162,11 +166,11 @@ function setupMasterModalEditorUI() {
       }
       .bmn-editor-inputs input,
       .bmn-editor-inputs select {
-        height: 34px;
+        height: 33px;
         padding: 0 10px;
         border: 1px solid #cbd5e1;
         border-radius: 7px;
-        font-size: 13px;
+        font-size: 12.5px;
         background: #ffffff;
         color: #1e293b;
         box-sizing: border-box;
@@ -177,8 +181,8 @@ function setupMasterModalEditorUI() {
         align-items: center;
       }
       .bmn-btn {
-        height: 34px;
-        padding: 0 14px;
+        height: 33px;
+        padding: 0 13px;
         border-radius: 7px;
         font-size: 12.5px;
         font-weight: 600;
@@ -189,11 +193,15 @@ function setupMasterModalEditorUI() {
         justify-content: center;
         transition: all 0.15s;
       }
+      .bmn-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
       .bmn-btn-primary {
         background: #2563eb;
         color: #ffffff;
       }
-      .bmn-btn-primary:hover {
+      .bmn-btn-primary:hover:not(:disabled) {
         background: #1d4ed8;
       }
       .bmn-btn-outline {
@@ -201,7 +209,7 @@ function setupMasterModalEditorUI() {
         color: #334155;
         border-color: #cbd5e1;
       }
-      .bmn-btn-outline:hover {
+      .bmn-btn-outline:hover:not(:disabled) {
         background: #f1f5f9;
       }
       .bmn-btn-danger-outline {
@@ -209,20 +217,23 @@ function setupMasterModalEditorUI() {
         color: #dc2626;
         border-color: #fecaca;
       }
-      .bmn-btn-danger-outline:hover {
+      .bmn-btn-danger-outline:hover:not(:disabled) {
         background: #fef2f2;
       }
       .bmn-search-wrap {
         flex-shrink: 0;
-        margin-bottom: 12px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 10px;
       }
       .bmn-search-wrap input {
-        width: 100%;
-        height: 38px;
+        flex: 1;
+        height: 36px;
         padding: 0 14px;
         border: 1px solid #cbd5e1;
         border-radius: 8px;
-        font-size: 13.5px;
+        font-size: 13px;
         box-sizing: border-box;
         outline: none;
       }
@@ -247,9 +258,6 @@ function setupMasterModalEditorUI() {
         background: #cbd5e1;
         border-radius: 4px;
       }
-      .bmn-table-scroll::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-      }
       .bmn-table-scroll table {
         width: 100%;
         border-collapse: collapse;
@@ -263,17 +271,30 @@ function setupMasterModalEditorUI() {
         color: #1e293b;
         font-weight: 700;
         text-align: left;
-        padding: 11px 14px;
+        padding: 10px 12px;
         border-bottom: 2px solid #cbd5e1;
       }
       .bmn-table-scroll tbody td {
-        padding: 9px 14px;
+        padding: 8px 12px;
         border-bottom: 1px solid #f1f5f9;
         color: #334155;
         vertical-align: middle;
       }
       .bmn-table-scroll tbody tr:hover {
         background: #f8fafc;
+      }
+      .bmn-paging-footer {
+        flex-shrink: 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding-top: 12px;
+        margin-top: 10px;
+        border-top: 1px solid #e2e8f0;
+        font-size: 12.5px;
+        color: #475569;
       }
     `;
     document.head.appendChild(style);
@@ -283,7 +304,6 @@ function setupMasterModalEditorUI() {
   if (!dialogBox || dialogBox.dataset.upgraded === "true") return;
   dialogBox.dataset.upgraded = "true";
 
-  // Bangun ulang struktur dalam kotak dialog agar 100% teratur dan bisa di-scroll
   dialogBox.innerHTML = `
     <div class="bmn-modal-header">
       <h3>Referensi & Editor Master BMN_Persediaan</h3>
@@ -292,12 +312,13 @@ function setupMasterModalEditorUI() {
 
     <div class="bmn-editor-bar">
       <div class="bmn-editor-inputs">
-        <input type="text" id="newKdBrg" placeholder="Kode 10 digit (10103...)" style="width:170px;" />
-        <input type="text" id="newUrSskel" placeholder="Uraian Barang Baru..." style="width:240px;" />
+        <input type="text" id="newKdBrg" placeholder="Kode 10 digit (10103...)" style="width:165px;" />
+        <input type="text" id="newUrSskel" placeholder="Nama / Uraian Barang..." style="width:235px;" />
         <select id="newKdAkun" style="width:185px;">
           <option value="117111">117111 - Barang Konsumsi</option>
           <option value="117113">117113 - Bahan Pemeliharaan</option>
           <option value="117114">117114 - Suku Cadang</option>
+          <option value="117131">117131 - Bahan Baku</option>
           <option value="117199">117199 - Persediaan Lainnya</option>
         </select>
         <button type="button" id="btnAddMasterItem" class="bmn-btn bmn-btn-primary">+ Tambah Kode</button>
@@ -309,26 +330,40 @@ function setupMasterModalEditorUI() {
     </div>
 
     <div class="bmn-search-wrap">
-      <input type="text" id="searchMasterInput" placeholder="Cari kode barang (10103...), uraian barang, atau kode akun (117111 / 117113)..." />
+      <input type="text" id="searchMasterInput" placeholder="Cari kode barang (10103...), nama/uraian barang, atau kode akun (117111 / 117113)..." />
+      <select id="masterPageSizeSelect" style="height:36px; padding:0 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:12.5px; background:#fff;">
+        <option value="25" selected>25 baris / hal</option>
+        <option value="50">50 baris / hal</option>
+        <option value="100">100 baris / hal</option>
+        <option value="500">Semua baris</option>
+      </select>
     </div>
 
-    <div class="bmn-table-scroll">
+    <div class="bmn-table-scroll" id="masterTableScrollBox">
       <table>
         <thead>
           <tr>
-            <th style="width:135px;">Kode Barang</th>
-            <th>Uraian Sub-Sub Kelompok (ur_sskel)</th>
-            <th style="width:95px;">Kode Akun</th>
-            <th style="width:195px;">Uraian Akun</th>
-            <th style="width:120px; text-align:center;">Aksi</th>
+            <th style="width:140px;">Kode Barang</th>
+            <th>Nama / Uraian Barang (ur_sskel)</th>
+            <th style="width:100px;">Kode Akun</th>
+            <th style="width:185px;">Uraian Akun</th>
+            <th style="width:125px; text-align:center;">Aksi</th>
           </tr>
         </thead>
         <tbody id="masterTableBody"></tbody>
       </table>
     </div>
+
+    <div class="bmn-paging-footer">
+      <div id="masterPagingInfo">Menampilkan 0 - 0 dari 0 data</div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button type="button" id="btnMasterPrevPage" class="bmn-btn bmn-btn-outline" style="height:30px; padding:0 10px;">&laquo; Sebelumnya</button>
+        <span id="masterPageIndicator" style="font-weight:600; padding:0 6px;">Halaman 1 / 1</span>
+        <button type="button" id="btnMasterNextPage" class="bmn-btn bmn-btn-outline" style="height:30px; padding:0 10px;">Berikutnya &raquo;</button>
+      </div>
+    </div>
   `;
 
-  // Pasang kembali event tombol tutup, klik luar modal, pencarian, tambah, salin, dan reset
   document.getElementById("closeModal").addEventListener("click", () => {
     modalOverlay.style.display = "none";
   });
@@ -339,12 +374,29 @@ function setupMasterModalEditorUI() {
     }
   });
 
-  document.getElementById("searchMasterInput").addEventListener("input", (e) => {
-    const q = e.target.value.toLowerCase();
-    const rows = document.querySelectorAll("#masterTableBody tr");
-    rows.forEach((tr) => {
-      tr.style.display = tr.textContent.toLowerCase().includes(q) ? "" : "none";
-    });
+  document.getElementById("searchMasterInput").addEventListener("input", () => {
+    masterCurrentPage = 1;
+    renderMasterTablePaged();
+  });
+
+  document.getElementById("masterPageSizeSelect").addEventListener("change", (e) => {
+    masterPageSize = parseInt(e.target.value, 10) || 25;
+    masterCurrentPage = 1;
+    renderMasterTablePaged();
+  });
+
+  document.getElementById("btnMasterPrevPage").addEventListener("click", () => {
+    if (masterCurrentPage > 1) {
+      masterCurrentPage--;
+      renderMasterTablePaged();
+      document.getElementById("masterTableScrollBox").scrollTop = 0;
+    }
+  });
+
+  document.getElementById("btnMasterNextPage").addEventListener("click", () => {
+    masterCurrentPage++;
+    renderMasterTablePaged();
+    document.getElementById("masterTableScrollBox").scrollTop = 0;
   });
 
   document.getElementById("btnAddMasterItem").addEventListener("click", () => {
@@ -353,7 +405,7 @@ function setupMasterModalEditorUI() {
     const akun = document.getElementById("newKdAkun").value.trim() || "117111";
 
     if (!kd || !ur) {
-      alert("Isi Kode Barang (10 digit) dan Uraian Barang terlebih dahulu.");
+      alert("Isi Kode Barang (10 digit) dan Nama/Uraian Barang terlebih dahulu.");
       return;
     }
     if (activeMasterList.some((m) => m.kd_brg === kd)) {
@@ -370,6 +422,7 @@ function setupMasterModalEditorUI() {
 
     document.getElementById("newKdBrg").value = "";
     document.getElementById("newUrSskel").value = "";
+    masterCurrentPage = 1;
     saveActiveMasterList();
     alert(`Kode ${kd} (${ur}) berhasil ditambahkan dan langsung aktif untuk deteksi nota!`);
   });
@@ -391,6 +444,7 @@ function setupMasterModalEditorUI() {
     if (!confirm("Kembalikan seluruh data Master Kode ke pengaturan awal file master_bmn.js?")) return;
     localStorage.removeItem(MASTER_STORAGE_KEY);
     activeMasterList = JSON.parse(JSON.stringify(DEFAULT_MASTER_BACKUP));
+    masterCurrentPage = 1;
     initMasterReference();
     reclassifyAllExtractedRows();
     alert("Master Kode berhasil dikembalikan ke pengaturan awal.");
@@ -401,30 +455,69 @@ function initMasterReference() {
   setupMasterModalEditorUI();
 
   const datalist = document.getElementById("bmnDatalist");
-  const masterBody = document.getElementById("masterTableBody");
   const btnMasterModal = document.getElementById("btnMasterModal");
-  const searchQuery = (document.getElementById("searchMasterInput")?.value || "").toLowerCase();
 
   if (btnMasterModal) {
     btnMasterModal.textContent = `Lihat / Edit Master (${activeMasterList.length})`;
   }
 
   datalist.innerHTML = "";
-  masterBody.innerHTML = "";
-
-  activeMasterList.forEach((item, idx) => {
+  activeMasterList.forEach((item) => {
     const opt = document.createElement("option");
     opt.value = `${item.kd_brg} - ${item.ur_sskel}`;
     datalist.appendChild(opt);
+  });
 
+  renderMasterTablePaged();
+}
+
+function renderMasterTablePaged() {
+  const masterBody = document.getElementById("masterTableBody");
+  const searchQuery = (document.getElementById("searchMasterInput")?.value || "").toLowerCase().trim();
+
+  // Filter berdasarkan kata kunci pencarian sambil menyimpan indeks asli di activeMasterList
+  const filteredEntries = activeMasterList
+    .map((item, originalIdx) => ({ item, originalIdx }))
+    .filter(({ item }) => {
+      if (!searchQuery) return true;
+      const text = `${item.kd_brg} ${item.ur_sskel} ${item.kd_akun} ${item.ur_akun}`.toLowerCase();
+      return text.includes(searchQuery);
+    });
+
+  const totalItems = filteredEntries.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / masterPageSize));
+  if (masterCurrentPage > totalPages) masterCurrentPage = totalPages;
+  if (masterCurrentPage < 1) masterCurrentPage = 1;
+
+  const startIdx = (masterCurrentPage - 1) * masterPageSize;
+  const endIdx = Math.min(startIdx + masterPageSize, totalItems);
+  const pageSlice = filteredEntries.slice(startIdx, endIdx);
+
+  // Perbarui info paging & tombol navigasi
+  const pagingInfo = document.getElementById("masterPagingInfo");
+  const pageIndicator = document.getElementById("masterPageIndicator");
+  const btnPrev = document.getElementById("btnMasterPrevPage");
+  const btnNext = document.getElementById("btnMasterNextPage");
+
+  if (pagingInfo) {
+    pagingInfo.textContent =
+      totalItems === 0
+        ? "Tidak ada data yang cocok dengan pencarian"
+        : `Menampilkan ${startIdx + 1} - ${endIdx} dari ${totalItems} kode barang`;
+  }
+  if (pageIndicator) {
+    pageIndicator.textContent = `Halaman ${masterCurrentPage} / ${totalPages}`;
+  }
+  if (btnPrev) btnPrev.disabled = masterCurrentPage <= 1;
+  if (btnNext) btnNext.disabled = masterCurrentPage >= totalPages;
+
+  masterBody.innerHTML = "";
+
+  pageSlice.forEach(({ item, originalIdx }) => {
     const tr = document.createElement("tr");
-    const rowText = `${item.kd_brg} ${item.ur_sskel} ${item.kd_akun} ${item.ur_akun}`.toLowerCase();
-    if (searchQuery && !rowText.includes(searchQuery)) {
-      tr.style.display = "none";
-    }
 
     tr.innerHTML = `
-      <td style="font-family:monospace; font-weight:700; color:#0f172a;">${escapeHtml(item.kd_brg)}</td>
+      <td class="m-kd-cell" style="font-family:monospace; font-weight:700; color:#0f172a;">${escapeHtml(item.kd_brg)}</td>
       <td class="m-ur-cell">${escapeHtml(item.ur_sskel)}</td>
       <td class="m-akun-cell" style="font-weight:600;">${escapeHtml(item.kd_akun)}</td>
       <td class="m-urakun-cell">${escapeHtml(item.ur_akun)}</td>
@@ -444,12 +537,14 @@ function initMasterReference() {
         btnEdit.style.color = "#ffffff";
         btnEdit.style.borderColor = "#16a34a";
 
+        tr.querySelector(".m-kd-cell").innerHTML = `<input type="text" class="edit-kd-inp" value="${escapeHtml(item.kd_brg)}" style="width:120px; height:30px; padding:0 6px; border:1px solid #2563eb; border-radius:6px; font-family:monospace; font-size:12.5px; box-sizing:border-box;" />`;
         tr.querySelector(".m-ur-cell").innerHTML = `<input type="text" class="edit-ur-inp" value="${escapeHtml(item.ur_sskel)}" style="width:100%; height:30px; padding:0 8px; border:1px solid #2563eb; border-radius:6px; font-size:12.5px; box-sizing:border-box;" />`;
         tr.querySelector(".m-akun-cell").innerHTML = `
           <select class="edit-akun-inp" style="height:30px; padding:0 6px; border:1px solid #2563eb; border-radius:6px; font-size:12.5px; background:#fff;">
             <option value="117111" ${item.kd_akun === "117111" ? "selected" : ""}>117111</option>
             <option value="117113" ${item.kd_akun === "117113" ? "selected" : ""}>117113</option>
             <option value="117114" ${item.kd_akun === "117114" ? "selected" : ""}>117114</option>
+            <option value="117131" ${item.kd_akun === "117131" ? "selected" : ""}>117131</option>
             <option value="117199" ${item.kd_akun === "117199" ? "selected" : ""}>117199</option>
           </select>
         `;
@@ -461,14 +556,16 @@ function initMasterReference() {
           inpUrAkun.value = getDefaultUraianAkun(selAkun.value);
         });
       } else {
+        const newKd = tr.querySelector(".edit-kd-inp").value.trim() || item.kd_brg;
         const newUr = tr.querySelector(".edit-ur-inp").value.trim();
         const newAkun = tr.querySelector(".edit-akun-inp").value.trim() || "117111";
         const newUrAkun = tr.querySelector(".edit-urakun-inp").value.trim() || getDefaultUraianAkun(newAkun);
 
         if (newUr) {
-          activeMasterList[idx].ur_sskel = newUr;
-          activeMasterList[idx].kd_akun = newAkun;
-          activeMasterList[idx].ur_akun = newUrAkun;
+          activeMasterList[originalIdx].kd_brg = newKd;
+          activeMasterList[originalIdx].ur_sskel = newUr;
+          activeMasterList[originalIdx].kd_akun = newAkun;
+          activeMasterList[originalIdx].ur_akun = newUrAkun;
           saveActiveMasterList();
         }
       }
@@ -476,7 +573,7 @@ function initMasterReference() {
 
     tr.querySelector(".btn-del-m").addEventListener("click", () => {
       if (!confirm(`Hapus kode barang ${item.kd_brg} (${item.ur_sskel}) dari daftar master?`)) return;
-      activeMasterList.splice(idx, 1);
+      activeMasterList.splice(originalIdx, 1);
       saveActiveMasterList();
     });
 

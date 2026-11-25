@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Persediaan Nota BMN (CV + OCR Non-AI)</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20261125" />
 </head>
 <body>
   <header class="topbar">
@@ -13,6 +13,10 @@
       <div>
         <h1>Persediaan Nota Belanja</h1>
         <p class="subtitle">Computer Vision (Thresholding + Morfologi Grid) &bull; Tesseract OCR &bull; Klasifikasi BMN_Persediaan (404 Kode)</p>
+        <div style="margin-top: 4px; display: inline-flex; align-items: center; gap: 6px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;">
+          <span>&#9679; Update Terakhir (25 Nov 2026):</span>
+          <span>Reset Kamus Sinonim dari Referensi SAKTI UC_PER032 BPS HSU (54 Kode &bull; 1.450 Item)</span>
+        </div>
       </div>
     </div>
     <div class="header-actions">
@@ -167,9 +171,9 @@
   <!-- Datalist untuk Autocomplete Kode Barang di Tabel -->
   <datalist id="bmnDatalist"></datalist>
 
-  <script src="master_bmn.js"></script>
+  <script src="master_bmn.js?v=20261125"></script>
   <script src="lib/tesseract.min.js"></script>
-  <script src="cv_ocr_engine.js"></script>
-  <script src="app.js"></script>
+  <script src="cv_ocr_engine.js?v=20261125"></script>
+  <script src="app.js?v=20261125"></script>
 </body>
 </html>

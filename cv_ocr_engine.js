@@ -94,7 +94,6 @@ class NotaCVEngine {
       for (let x = 0; x < width; x++) {
         if (garisH[rowOffset + x] === 1) count++;
       }
-      // Ambang 28% lebar gambar agar garis tipis hasil kompresi WA tetap tertangkap
       if (count > width * 0.28) {
         yLines.push(y);
       }
@@ -211,12 +210,20 @@ class NotaCVEngine {
     let maxKeywordMatchLen = 0;
 
     for (const rule of KAMUS_SINONIM_PERSEDIAAN) {
+      const targetCode = rule.kd_brg || rule.kode;
       for (const kw of rule.keywords) {
-        const escapedKw = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const cleanKw = kw
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!cleanKw) continue;
+
+        const escapedKw = cleanKw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const regex = new RegExp(`(^|\\s)${escapedKw}(\\s|$)`, "i");
-        if (regex.test(cleanInput) && kw.length > maxKeywordMatchLen) {
-          maxKeywordMatchLen = kw.length;
-          bestSynonymCode = rule.kd_brg;
+        if (regex.test(cleanInput) && cleanKw.length > maxKeywordMatchLen) {
+          maxKeywordMatchLen = cleanKw.length;
+          bestSynonymCode = targetCode;
         }
       }
     }
@@ -229,7 +236,7 @@ class NotaCVEngine {
           ur_sskel: found.ur_sskel,
           kd_akun: found.kd_akun,
           score: 95,
-          method: "Aturan Sinonim"
+          method: "Kamus SAKTI"
         };
       }
     }

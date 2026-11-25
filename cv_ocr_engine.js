@@ -1,6 +1,6 @@
 /**
  * Mesin Computer Vision Klasik + Tesseract OCR + Klasifikasi Kode Barang BMN_Persediaan
- * Ditingkatkan untuk garis tabel tipis hasil kompresi WhatsApp/JPEG serta toleransi tinggi.
+ * Versi 2.2: Pencocokan Dua Arah Kamus SAKTI UC_PER032 + Kata Kunci Merek Umum
  */
 
 class NotaCVEngine {
@@ -206,10 +206,25 @@ class NotaCVEngine {
       ? masterList.filter((m) => m.kd_akun === "117111" || m.kd_akun === "117113")
       : masterList;
 
+    // 1. Cek Kamus Sinonim SAKTI (pencocokan frasa eksak & sub-kata kunci merek)
+    const sinonimList = typeof KAMUS_SINONIM_PERSEDIAAN !== "undefined" ? KAMUS_SINONIM_PERSEDIAAN : [];
     let bestSynonymCode = null;
-    let maxKeywordMatchLen = 0;
+    let bestSynonymScore = 0;
 
-    for (const rule of KAMUS_SINONIM_PERSEDIAAN) {
+    // Tambahkan pemetaan merek/kata kunci inti yang sering muncul di nota retail
+    const extraQuickRules = [
+      { kd_brg: "1010305012", keywords: ["stella", "glade", "bayfresh", "pengharum"] },
+      { kd_brg: "1010305002", keywords: ["tisu", "tissue", "paseo", "jolly", "nice", "kanebo"] },
+      { kd_brg: "1010305005", keywords: ["sunlight", "mama lemon", "cuci piring"] },
+      { kd_brg: "1010305008", keywords: ["sabun cuci tangan", "hand wash", "handwash", "vixal", "wipol", "super sol", "soklin", "so klin", "cling", "baygon"] },
+      { kd_brg: "1010305006", keywords: ["lakban", "isolasi", "double tape", "rafia"] },
+      { kd_brg: "1010301001", keywords: ["pulpen", "bolpoin", "ballpoint", "spidol", "pensil", "stabilo", "snowman", "pilot", "standard ae7"] },
+      { kd_brg: "1010302001", keywords: ["kertas hvs", "kertas a4", "kertas f4", "kertas a3", "sidu", "paperone"] }
+    ];
+
+    const allRules = [...sinonimList, ...extraQuickRules];
+
+    for (const rule of allRules) {
       const targetCode = rule.kd_brg || rule.kode;
       for (const kw of rule.keywords) {
         const cleanKw = kw
@@ -217,13 +232,24 @@ class NotaCVEngine {
           .replace(/[^a-z0-9\s]/g, " ")
           .replace(/\s+/g, " ")
           .trim();
-        if (!cleanKw) continue;
+        if (!cleanKw || cleanKw.length < 3) continue;
 
         const escapedKw = cleanKw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const regex = new RegExp(`(^|\\s)${escapedKw}(\\s|$)`, "i");
-        if (regex.test(cleanInput) && cleanKw.length > maxKeywordMatchLen) {
-          maxKeywordMatchLen = cleanKw.length;
-          bestSynonymCode = targetCode;
+
+        // Cocokkan jika keyword ada di dalam nama nota, atau nama nota (min 5 huruf) ada di dalam keyword
+        if (regex.test(cleanInput)) {
+          const priorityScore = cleanKw.length + 100;
+          if (priorityScore > bestSynonymScore) {
+            bestSynonymScore = priorityScore;
+            bestSynonymCode = targetCode;
+          }
+        } else if (cleanInput.length >= 6 && cleanKw.includes(cleanInput)) {
+          const priorityScore = cleanInput.length + 50;
+          if (priorityScore > bestSynonymScore) {
+            bestSynonymScore = priorityScore;
+            bestSynonymCode = targetCode;
+          }
         }
       }
     }
@@ -241,6 +267,7 @@ class NotaCVEngine {
       }
     }
 
+    // 2. Pencocokan Kemiripan Teks (Fuzzy Match) ke Uraian Master BMN
     let bestMatch = null;
     let bestScore = 0;
 

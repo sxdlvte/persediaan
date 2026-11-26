@@ -2,7 +2,7 @@
  * Mesin Computer Vision Klasik + Tesseract OCR + Klasifikasi Kode Barang BMN_Persediaan
  * Versi 2.3 (25 Nov 2026): Kamus Merek Retail Prioritas + Kamus SAKTI UC_PER032 + Fuzzy Match
  */
-window.CV_ENGINE_VERSION = "v2.3-MEREK-SAKTI";
+window.CV_ENGINE_VERSION = "v4-MEREK-SAKTI";
 
 // Daftar pemetaan merek dagang & kata kunci inti -> Kode Barang BMN_Persediaan
 const KAMUS_MEREK_RETAIL = [
@@ -11,9 +11,9 @@ const KAMUS_MEREK_RETAIL = [
   // 1010305002 - Alat Kebersihan Lainnya (Tisu, Kanebo, Pel, Lap)
   { kd_brg: "1010305002", merek: ["tisu", "tissue", "paseo", "jolly", "nice", "montiss", "tessa", "multi", "kanebo", "chamois", "pel lantai", "wiper"] },
   // 1010305005 - Sabun & Bahan Pembersih Dapur
-  { kd_brg: "1010305005", merek: ["sunlight", "mama lemon", "ekonomi", "cuci piring"] },
+  { kd_brg: "1010305005", merek: ["kunci", "semprotan", "kran"] },
   // 1010305008 - Bahan Kimia Untuk Pembersih (Lantai, Kaca, Toilet, Handwash, Obat Nyamuk)
-  { kd_brg: "1010305008", merek: ["vixal", "wipol", "super sol", "supersol", "sos lantai", "so klin", "soklin", "cling", "mr muscle", "porstex", "harpic", "dettol", "lifebuoy", "nuvo", "hand wash", "handwash", "cuci tangan", "baygon", "hit spray", "vape"] },
+  { kd_brg: "1010305008", merek: ["sunlight", "mama lemon", "ekonomi", "cuci piring","vixal", "wipol", "super sol", "supersol", "sos lantai", "so klin", "soklin", "cling", "mr muscle", "porstex", "harpic", "dettol", "lifebuoy", "nuvo", "hand wash", "handwash", "cuci tangan", "baygon", "hit spray", "vape"] },
   // 1010305001 - Sapu & Sikat
   { kd_brg: "1010305001", merek: ["sapu", "sikat", "kemoceng"] },
   // 1010305006 - Lakban, Isolasi & Tali

@@ -771,7 +771,7 @@ async function tryPaddleOCR(canvasElement) {
   lastPaddleError = "";
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     const health = await fetch(`${PADDLE_API_URL}/health`, { signal: controller.signal });
     clearTimeout(timeoutId);
 

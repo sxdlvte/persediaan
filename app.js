@@ -735,6 +735,32 @@ function isNoiseOrNonItemLine(text) {
   return false;
 }
 
+const PADDLE_API_URL = "http://127.0.0.1:8000";
+
+async function tryPaddleOCR(canvasElement) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1200);
+    const health = await fetch(`${PADDLE_API_URL}/health`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!health.ok) return null;
+
+    const blob = await new Promise((resolve) => canvasElement.toBlob(resolve, "image/png"));
+    const formData = new FormData();
+    formData.append("file", blob, "nota.png");
+
+    const res = await fetch(`${PADDLE_API_URL}/ocr`, {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    // Jika server Python tidak dijalankan, otomatis kembali ke Tesseract.js
+    return null;
+  }
+}
+
 async function processNotaImage(img) {
   statusBadge.className = "badge badge-run";
   statusBadge.textContent = "Memproses CV + OCR...";
@@ -797,6 +823,27 @@ async function processNotaImage(img) {
   setProgress(35, "Memuat mesin Tesseract OCR...");
 
   try {
+    setProgress(35, "Mengecek server lokal PaddleOCR...");
+  const paddleData = await tryPaddleOCR(originalCanvas);
+
+  if (paddleData && paddleData.status === "success") {
+    setProgress(70, "Memetakan hasil deteksi PaddleOCR ke Master BMN...");
+    let rawLog = ["=== MESIN OCR: PADDLEOCR (HIGH ACCURACY) ===\n" + paddleData.text];
+    parseHeaderMetadata(paddleData.text);
+
+    extractedRows = [];
+    // Gunakan parser spasial multi-baris dengan koordinat presisi dari PaddleOCR
+    parseSpatialMultiLineItems({ words: paddleData.words }, w, h, rawLog);
+
+    rawTextOutput.textContent = rawLog.join("\n");
+    renderResultTable();
+
+    setProgress(100, "Selesai (PaddleOCR)!");
+    statusBadge.className = "badge badge-done";
+    statusBadge.textContent = `Selesai via PaddleOCR (${extractedRows.length} item)`;
+    btnExportCsv.disabled = extractedRows.length === 0;
+    return;
+  }
     const isChromeExtension = typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL;
     const resolveAssetPath = (relPath) =>
       isChromeExtension ? chrome.runtime.getURL(relPath) : `./${relPath}`;

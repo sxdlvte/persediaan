@@ -1,6 +1,6 @@
 /**
  * Pengendali Antarmuka Detektor Persediaan Nota BMN
- * Versi 2.7: Modal Master BMN dengan Paging + Scroll + Edit Lengkap Master Barang
+ * Versi 2.8: Hybrid PaddleOCR + Tesseract.js + Editor Master BMN (Paging & Scroll)
  */
 
 const cvEngine = new NotaCVEngine();
@@ -10,6 +10,10 @@ let binaryCanvas = document.createElement("canvas");
 let overlayCanvas = document.createElement("canvas");
 let activeView = "overlay";
 let extractedRows = [];
+
+// Konfigurasi Server Lokal PaddleOCR
+const PADDLE_API_URL = "http://127.0.0.1:8000";
+let lastPaddleError = "";
 
 // Penyimpanan Master BMN Aktif (tersimpan otomatis di browser setelah diedit)
 const MASTER_STORAGE_KEY = "bmn_master_persediaan_custom_v1";
@@ -475,7 +479,6 @@ function renderMasterTablePaged() {
   const masterBody = document.getElementById("masterTableBody");
   const searchQuery = (document.getElementById("searchMasterInput")?.value || "").toLowerCase().trim();
 
-  // Filter berdasarkan kata kunci pencarian sambil menyimpan indeks asli di activeMasterList
   const filteredEntries = activeMasterList
     .map((item, originalIdx) => ({ item, originalIdx }))
     .filter(({ item }) => {
@@ -493,7 +496,6 @@ function renderMasterTablePaged() {
   const endIdx = Math.min(startIdx + masterPageSize, totalItems);
   const pageSlice = filteredEntries.slice(startIdx, endIdx);
 
-  // Perbarui info paging & tombol navigasi
   const pagingInfo = document.getElementById("masterPagingInfo");
   const pageIndicator = document.getElementById("masterPageIndicator");
   const btnPrev = document.getElementById("btnMasterPrevPage");
@@ -735,17 +737,21 @@ function isNoiseOrNonItemLine(text) {
   return false;
 }
 
-const PADDLE_API_URL = "http://127.0.0.1:8000";
-
+// Koneksi ke Server Lokal PaddleOCR
 async function tryPaddleOCR(canvasElement) {
+  lastPaddleError = "";
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
     const health = await fetch(`${PADDLE_API_URL}/health`, { signal: controller.signal });
     clearTimeout(timeoutId);
-    if (!health.ok) return null;
 
-    setProgress(40, "Mengirim gambar ke server lokal PaddleOCR...");
+    if (!health.ok) {
+      lastPaddleError = `Server merespons status ${health.status}`;
+      return null;
+    }
+
+    setProgress(45, "Mengirim gambar ke PaddleOCR...");
     const blob = await new Promise((resolve) => canvasElement.toBlob(resolve, "image/png"));
     const formData = new FormData();
     formData.append("file", blob, "nota.png");
@@ -754,10 +760,14 @@ async function tryPaddleOCR(canvasElement) {
       method: "POST",
       body: formData
     });
-    if (!res.ok) return null;
+
+    if (!res.ok) {
+      lastPaddleError = `Endpoint /ocr gagal (${res.status})`;
+      return null;
+    }
     return await res.json();
   } catch (err) {
-    console.warn("PaddleOCR tidak terjangkau, beralih ke Tesseract.js:", err.message);
+    lastPaddleError = err.message || "Tidak dapat terhubung ke http://127.0.0.1:8000";
     return null;
   }
 }
@@ -821,19 +831,16 @@ async function processNotaImage(img) {
 
   renderCanvasView();
 
-  setProgress(35, "Memuat mesin Tesseract OCR...");
-
-  try {
-    setProgress(35, "Mengecek server lokal PaddleOCR...");
+  // TAHAP UTAMA: Coba gunakan server lokal PaddleOCR terlebih dahulu
+  setProgress(35, "Menghubungkan ke server PaddleOCR...");
   const paddleData = await tryPaddleOCR(originalCanvas);
 
   if (paddleData && paddleData.status === "success") {
-    setProgress(70, "Memetakan hasil deteksi PaddleOCR ke Master BMN...");
-    let rawLog = ["=== MESIN OCR: PADDLEOCR (HIGH ACCURACY) ===\n" + paddleData.text];
+    setProgress(75, "Memetakan hasil PaddleOCR ke Master BMN...");
+    let rawLog = ["=== MESIN OCR: PADDLEOCR (AKTIF) ===\n" + paddleData.text];
     parseHeaderMetadata(paddleData.text);
 
     extractedRows = [];
-    // Gunakan parser spasial multi-baris dengan koordinat presisi dari PaddleOCR
     parseSpatialMultiLineItems({ words: paddleData.words }, w, h, rawLog);
 
     rawTextOutput.textContent = rawLog.join("\n");
@@ -845,6 +852,11 @@ async function processNotaImage(img) {
     btnExportCsv.disabled = extractedRows.length === 0;
     return;
   }
+
+  // CADANGAN (FALLBACK): Gunakan Tesseract.js jika server PaddleOCR tidak dijalankan
+  setProgress(35, "Memuat mesin cadangan Tesseract OCR...");
+
+  try {
     const isChromeExtension = typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL;
     const resolveAssetPath = (relPath) =>
       isChromeExtension ? chrome.runtime.getURL(relPath) : `./${relPath}`;
@@ -858,6 +870,9 @@ async function processNotaImage(img) {
     });
 
     let rawLog = [];
+    if (lastPaddleError) {
+      rawLog.push(`⚠️ Info PaddleOCR: ${lastPaddleError} (Beralih ke Tesseract.js)\n`);
+    }
 
     setProgress(45, "Membaca header nota (Toko, Tanggal, Nomor)...");
     const headerCanvas = document.createElement("canvas");

@@ -15,10 +15,39 @@ let extractedRows = [];
 const PADDLE_API_URL = "http://127.0.0.1:8000";
 let lastPaddleError = "";
 
-// Penyimpanan Master BMN Aktif (tersimpan otomatis di browser setelah diedit)
+// Penyimpanan Master BMN Aktif (otomatis sinkron jika master_bmn.js diperbarui)
 const MASTER_STORAGE_KEY = "bmn_master_persediaan_custom_v1";
+const MASTER_SIG_KEY = "bmn_master_persediaan_sig_v1";
 const DEFAULT_MASTER_BACKUP = JSON.parse(JSON.stringify(MASTER_BMN_PERSEDIAAN));
 let activeMasterList = loadActiveMasterList();
+
+function getMasterSignature(list) {
+  return `${list.length}_${list[0]?.kd_brg || ""}_${list[list.length - 1]?.kd_brg || ""}_${list[list.length - 1]?.ur_sskel || ""}`;
+}
+
+function loadActiveMasterList() {
+  const currentFileSig = getMasterSignature(DEFAULT_MASTER_BACKUP);
+  try {
+    const savedSig = localStorage.getItem(MASTER_SIG_KEY);
+    const saved = localStorage.getItem(MASTER_STORAGE_KEY);
+
+    // Jika file master_bmn.js baru saja diedit/di-push, abaikan cache lama dan pakai file terbaru
+    if (savedSig !== currentFileSig) {
+      localStorage.removeItem(MASTER_STORAGE_KEY);
+      localStorage.setItem(MASTER_SIG_KEY, currentFileSig);
+      return JSON.parse(JSON.stringify(DEFAULT_MASTER_BACKUP));
+    }
+
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn("Gagal memuat custom master dari localStorage:", e);
+  }
+  localStorage.setItem(MASTER_SIG_KEY, currentFileSig);
+  return JSON.parse(JSON.stringify(DEFAULT_MASTER_BACKUP));
+}
 
 // State Paging Modal Master
 let masterCurrentPage = 1;

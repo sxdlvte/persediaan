@@ -250,6 +250,7 @@ class NotaCVEngine {
     const pool = prioritizeBps
       ? masterList.filter((m) => m.kd_akun === "117111" || m.kd_akun === "117113")
       : masterList;
+    const activePool = pool.length > 0 ? pool : masterList;
 
     // TAHAP 1: Cek Kamus Merek Retail Prioritas (Stella, Paseo, Sunlight, Vixal, dll.)
     let bestMerekCode = null;
@@ -268,7 +269,7 @@ class NotaCVEngine {
     }
 
     if (bestMerekCode) {
-      const found = masterList.find((m) => m.kd_brg === bestMerekCode);
+      const found = masterList.find((m) => String(m.kd_brg).trim() === String(bestMerekCode).trim());
       if (found) {
         return {
           kd_brg: found.kd_brg,
@@ -280,7 +281,7 @@ class NotaCVEngine {
       }
     }
 
-    // TAHAP 2: Cek Kamus Sinonim SAKTI UC_PER032 (1.450 item riwayat pembukuan)
+    // TAHAP 2: Cek Kamus Sinonim SAKTI UC_PER032
     const sinonimList = typeof KAMUS_SINONIM_PERSEDIAAN !== "undefined" ? KAMUS_SINONIM_PERSEDIAAN : [];
     let bestSynonymCode = null;
     let bestSynonymScore = 0;
@@ -315,7 +316,7 @@ class NotaCVEngine {
     }
 
     if (bestSynonymCode) {
-      const found = masterList.find((m) => m.kd_brg === bestSynonymCode);
+      const found = masterList.find((m) => String(m.kd_brg).trim() === String(bestSynonymCode).trim());
       if (found) {
         return {
           kd_brg: found.kd_brg,
@@ -327,11 +328,11 @@ class NotaCVEngine {
       }
     }
 
-    // TAHAP 3: Pencocokan Kemiripan Teks (Fuzzy Match) ke Uraian Baku BMN
+    // TAHAP 3: Pencocokan Kemiripan Teks (Fuzzy Match) ke Uraian Baku BMN (yang baru diedit)
     let bestMatch = null;
     let bestScore = 0;
 
-    for (const item of pool) {
+    for (const item of activePool) {
       const target = item.ur_sskel.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
       const score = this.computeFuzzyScore(cleanInput, target);
       if (score > bestScore) {
@@ -351,7 +352,7 @@ class NotaCVEngine {
     }
 
     // TAHAP 4: Cadangan Default
-    const fallback = masterList.find((m) => m.kd_brg === "1010399999") || pool[0];
+    const fallback = masterList.find((m) => m.kd_brg === "1010399999") || activePool[0];
     return {
       kd_brg: fallback.kd_brg,
       ur_sskel: fallback.ur_sskel,

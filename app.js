@@ -740,11 +740,12 @@ const PADDLE_API_URL = "http://127.0.0.1:8000";
 async function tryPaddleOCR(canvasElement) {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1200);
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
     const health = await fetch(`${PADDLE_API_URL}/health`, { signal: controller.signal });
     clearTimeout(timeoutId);
     if (!health.ok) return null;
 
+    setProgress(40, "Mengirim gambar ke server lokal PaddleOCR...");
     const blob = await new Promise((resolve) => canvasElement.toBlob(resolve, "image/png"));
     const formData = new FormData();
     formData.append("file", blob, "nota.png");
@@ -756,7 +757,7 @@ async function tryPaddleOCR(canvasElement) {
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
-    // Jika server Python tidak dijalankan, otomatis kembali ke Tesseract.js
+    console.warn("PaddleOCR tidak terjangkau, beralih ke Tesseract.js:", err.message);
     return null;
   }
 }

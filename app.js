@@ -12,7 +12,7 @@ let activeView = "overlay";
 let extractedRows = [];
 
 // Konfigurasi Server Lokal PaddleOCR
-const PADDLE_API_URL = "http://127.0.0.1:8000";
+const PADDLE_API_URL = "https://sxdlvte-persediaan1.static.hf.space";
 let lastPaddleError = "";
 
 // Penyimpanan Master BMN Aktif (otomatis sinkron jika master_bmn.js diperbarui)

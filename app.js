@@ -1027,6 +1027,8 @@ async function processNotaImage(img) {
     statusBadge.className = "badge badge-done";
     statusBadge.textContent = `Selesai (${extractedRows.length} item)`;
     btnExportCsv.disabled = extractedRows.length === 0;
+    btnCopyTxt.disabled = extractedRows.length === 0;
+    if (typeof btnCopyTxt !== "undefined") btnCopyTxt.disabled = extractedRows.length === 0;
   } catch (err) {
     console.error(err);
     statusBadge.className = "badge badge-idle";
@@ -1266,6 +1268,7 @@ function updateSummary() {
   document.getElementById("sumGrandTotal").textContent = formatRupiah(grandTotal);
   document.getElementById("metaTotal").value = formatRupiah(grandTotal);
   btnExportCsv.disabled = extractedRows.length === 0;
+  btnCopyTxt.disabled = extractedRows.length === 0;
 }
 
 btnAddRow.addEventListener("click", () => {
@@ -1332,6 +1335,39 @@ btnExportCsv.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
+// Fitur Salin Format TXT (2 Kolom: nama barang | kode barang)
+const btnCopyTxt = document.createElement("button");
+btnCopyTxt.id = "btnCopyTxt";
+btnCopyTxt.type = "button";
+btnCopyTxt.className = btnExportCsv.className;
+btnCopyTxt.textContent = "Salin TXT (Nama | Kode)";
+btnCopyTxt.disabled = true;
+btnCopyTxt.style.marginLeft = "8px";
+btnExportCsv.parentNode.insertBefore(btnCopyTxt, btnExportCsv.nextSibling);
+
+btnCopyTxt.addEventListener("click", async () => {
+  if (extractedRows.length === 0) return;
+
+  const lines = ["nama barang | kode barang"];
+  extractedRows.forEach((r) => {
+    const nama = (r.nama || "-").replace(/\|/g, " ").replace(/\s+/g, " ").trim();
+    const kode = (r.kd_brg || "-").trim();
+    lines.push(`${nama} | ${kode}`);
+  });
+
+  const txtOutput = lines.join("\n");
+
+  try {
+    await navigator.clipboard.writeText(txtOutput);
+    const originalLabel = btnCopyTxt.textContent;
+    btnCopyTxt.textContent = "Tersalin!";
+    setTimeout(() => {
+      btnCopyTxt.textContent = originalLabel;
+    }, 1800);
+  } catch (err) {
+    prompt("Salin manual teks di bawah ini (Ctrl + C):", txtOutput);
+  }
+});
 const masterModal = document.getElementById("masterModal");
 document.getElementById("btnMasterModal").addEventListener("click", () => {
   masterModal.style.display = "flex";
